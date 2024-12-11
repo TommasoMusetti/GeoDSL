@@ -1,43 +1,47 @@
+/*
 Caida {
     obtain traceroute_list
     from probes
     to probes
-    limit 1 on measurements 
+    limit 1 on measurements
     limit 1 on sources
     limit 1000 on results
     filter star that "<=" of 0
     coordinate on
-    asn on 
-    source_country "DE"
-    target_country "IT" 
+    asn on
+    source_country "IL"
+    target_country "DE"
     verbose on
     cache on
-    timeframe "2023-02-05 00:00:00",start
-    timeframe "2023-02-06 00:00:00",stop
+    timeframe "2022-10-01 00:00:00",start
+    timeframe "2024-10-01 00:00:00",stop
 
     execute()
 }
+*/
 
-/*RIPEAtlas {
-    obtain ping_list
-    from anchors
-    to anchors
-    limit 1 on measurements 
-    limit 1 on targets 
-    limit 1 on sources
-    limit 2 on results
-    filter star that "<=" of 0
-    coordinate on
-    asn on 
-    source_country "IT"
-    target_country "DE" 
-    verbose on
-    cache off
-    timeframe "2023-02-05 00:00:00",start
-    timeframe "2023-08-27 00:00:00",stop
+    RIPEAtlas {
+        obtain anomaly_detection_ping,graph
+        from anchors
+        to anchors
+        limit 30 on measurements
+        limit 30 on targets
+        limit 30 on sources
+        limit 50000 on results
+        filter star that "<=" of 0
+        coordinate on
+        asn on
+        source_country "IL"
+        target_country "IR"
+        verbose on
+        cache on
+        timeframe "2023-01-01 00:00:00",start
+        timeframe "2024-11-01 00:00:00",stop
 
-    execute()
-}
+        execute()
+    }
+
+/*
 
 RIPEAtlas {
     obtain traceroute_list
@@ -47,14 +51,14 @@ RIPEAtlas {
     limit 1 on targets
     limit 1 on sources
     limit 50 on results
-    filter hop that ">=" of 3  
-    coordinate on  
-    source_country "IT"
-    target_country "DE" 
+    filter hop that ">=" of 3
+    coordinate on
+    source_country "IL"
+    target_country "IR"
     verbose on
     cache off
-    timeframe "2022-01-01 00:00:00",start
-    timeframe "2022-05-30 00:00:00",stop
+    timeframe "2022-02-05 00:00:00",start
+    timeframe "2024-02-12 00:00:00",stop
     execute()
 }
 
@@ -63,18 +67,18 @@ Caida {
     obtain traceroute_list
     from probes
     to probes
-    limit 1 on measurements 
+    limit 1 on measurements
     limit 1 on sources
     limit 1000 on results
     filter star that "<=" of 0
     coordinate on
-    asn on 
-    source_country "DE"
-    target_country "IT" 
+    asn on
+    source_country "IL"
+    target_country "IR"
     verbose on
     cache off
-    timeframe "2023-02-05 00:00:00",start
-    timeframe "2023-02-06 00:00:00",stop
+    timeframe "2022-02-05 00:00:00",start
+    timeframe "2024-02-12 00:00:00",stop
 
     execute()
 }*/

@@ -1,12 +1,32 @@
 package it.unipi.DSL
 
+@Grab(group='com.github.haifengl', module='smile-core', version='3.1.1')
+@Grab(group='org.jfree', module='jfreechart', version='1.5.5')
+@Grab(group='com.itextpdf', module='itextpdf', version='5.5.13.4')
+
 import groovy.json.JsonOutput
 import groovy.json.JsonGenerator
 import groovy.json.JsonSlurper
 import java.text.SimpleDateFormat
 import it.unipi.DSL.Parser.*
 import it.unipi.DSL.Network.*
-
+import smile.anomaly.IsolationForest
+import smile.anomaly.IsolationTree
+import org.jfree.chart.ChartFactory
+import org.jfree.chart.ChartPanel
+import org.jfree.chart.JFreeChart
+import org.jfree.chart.plot.CategoryPlot
+import org.jfree.chart.axis.CategoryLabelPositions
+import org.jfree.chart.renderer.category.BarRenderer
+import org.jfree.data.category.DefaultCategoryDataset
+import com.itextpdf.text.Document
+import com.itextpdf.text.Image
+import com.itextpdf.text.pdf.PdfWriter
+import org.jfree.chart.ChartUtils
+import javax.swing.JFrame
+import java.awt.Font
+import java.io.File
+import java.io.FileOutputStream
 
 
 class request {
@@ -220,6 +240,7 @@ class request {
 
     boolean asn_on = false
     boolean coordinate_on = false
+    def anomaly_output = null
     String reqF = "" //operazione da eseguire sui dati
     boolean error = false
     
@@ -317,6 +338,7 @@ class request {
         }
         dCountry = c
     }
+
     void timeframe (String t, String f){
         if (module.equals("Caida")) {
             start_date = t
@@ -335,9 +357,13 @@ class request {
             }
         }
     }
-    void obtain(String r){
-        reqF = r
+
+    void obtain(String... params){
+        reqF = params[0]
+        if(params.size() > 1)
+            anomaly_output = params[1]
     }
+
     synchronized String sendRequestWithCacheCheck(String url2, StringBuilder bres){ // bres: contiene un StringBuilder per costruire il vettore di stringhe di risultati
         String res
         if (debug) println("creo thread")
@@ -681,7 +707,7 @@ class request {
                             limit = res_limit
                    }
                  }
-                while(count<limit){
+
                     for (int j = 0; j < object.size() && count<limit; j++){
                         while (sipsIt.hasNext()){
                             sourceData tmp = sipsIt.next()
@@ -698,7 +724,7 @@ class request {
                             break
                         }
                         sipsIt = s.listIterator()
-                    }
+
                     if(count>=limit) break
                 }
             }
@@ -874,6 +900,93 @@ class request {
         }
     }
     
+        void anomaly_detection_ping(LinkedList<?> inputs){
+        int numTrees = 100
+        int maxDepth = 256
+        int extensionLevel = 1
+
+        def map = [:].withDefault { [somma: 0.0, conta: 0.0]}
+
+        inputs.each { elem ->
+            map[elem.data].somma += elem.ping
+            map[elem.data].conta += 1
+        }
+
+        def medie = [:]
+        map.each { data, stats ->
+            medie[data] = stats.somma / stats.conta
+        }
+
+        //array input algoritmo, contiene solo le medie
+        List<double[]> data_tree = medie.values().collect { it as double[]}
+
+        IsolationTree[] trees = new IsolationTree[numTrees]
+        for (int i = 0; i < numTrees; i++) {
+            trees[i] = new IsolationTree(data_tree, maxDepth, extensionLevel)
+        }
+
+        //costruttore algoritmo
+        IsolationForest forest = new IsolationForest(numTrees, maxDepth, trees)
+
+        //lista che contiene gli score assegnati ai valori medi
+        List<Double[]> inputs_score = new ArrayList<Double>()
+
+        data_tree.each{ point ->
+            inputs_score.add(forest.score(point))
+        }
+
+        def results = [:]
+        map.keySet().eachWithIndex{ chiave, indice ->
+            results[chiave] = inputs_score[indice]
+        }
+
+        def formato_data = new SimpleDateFormat("dd/MM/yyyy")
+
+        //giorni ordinati dal più recente al meno
+        def sorted_results = results.sort{a, b ->
+            formato_data.parse(a.key) <=> formato_data.parse(b.key)
+        }
+
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset()
+
+        sorted_results.each { label, valore ->
+            dataset.addValue(valore, "Giorno", label)
+        }
+
+        if(anomaly_output.equals("txt")){
+            FileWriter f = new FileWriter("anomaly_detection.txt", false)
+            String towrite = JsonOutput.toJson(sorted_results)
+            f.write(towrite)
+            f.close()
+        }else if(anomaly_output.equals("graph")){
+            JFreeChart chart = ChartFactory.createBarChart(
+                "",
+                "Data",
+                "Score",
+                dataset
+            )
+
+            chart.getCategoryPlot().getDomainAxis().setCategoryLabelPositions(CategoryLabelPositions.UP_90);
+
+            File imageFile = new File("chart_image.png")
+            ChartUtils.saveChartAsPNG(imageFile, chart, 800, 600)
+
+            //crea un documento PDF e aggiunge l'immagine
+            Document document = new Document()
+            PdfWriter.getInstance(document, new FileOutputStream("anomaly_detection_chart.pdf"))
+            document.open()
+
+            //carica l'immagine dal file PNG
+            Image chartImage = Image.getInstance(imageFile.getAbsolutePath())
+            chartImage.scaleToFit(500, 400)
+            document.add(chartImage)
+
+            document.close()
+
+            //si elimina il file png perchè non ci serve più
+            imageFile.delete()
+        }
+    }
 
     void id(int i){
         id = i
@@ -927,6 +1040,16 @@ class request {
                 String towrite = generator.toJson(c.data)
                 f.write(towrite)
                 f.close()
+            }
+            else if (reqF.contains("anomaly_detection_ping")){
+                if (debug) println("targets")
+                getIps(destProbesIps, "dest")
+                if (debug) println("sources")
+                getIps(sourceProbesIps, "source")
+                getMeas(measIds, destProbesIps, "ping")
+                container c = new container()
+                getPingList(measIds, sourceProbesIps, c)
+                anomaly_detection_ping(c.data)
             }
         }
 

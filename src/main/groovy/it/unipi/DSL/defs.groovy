@@ -24,5 +24,8 @@ class defs{
     final String ping_list = "ping_list"
     final String measurement_list = "measurement_list"
     final String periodic = "periodic"
+    final String anomaly_detection_ping = "anomaly_detection_ping"
+    final String txt = "txt"
+    final String graph = "graph"
 }
 
